@@ -3,8 +3,10 @@ import * as system from "../../system.js";
 import * as blocklists from "./blocklists.ts";
 import * as dbip from "./dbip.ts";
 import { services, stopAfter } from "../svc.js";
-import Log, { LogLevels } from "../log.js";
+import Log, { setLogger } from "../log.js";
 import EnvManager from "../env.js";
+
+type LogLevels = "error" | "logpush" | "warn" | "info" | "timer" | "debug";
 
 // In global scope.
 declare global {
@@ -12,7 +14,6 @@ declare global {
   // (globalThis) with declaration merging (archive.is/YUWh2) to define types
   // Ref: www.typescriptlang.org/docs/handbook/declaration-merging.html
   var envManager: EnvManager | null;
-  var log: Log | null;
   var env: any | null;
 }
 
@@ -25,17 +26,18 @@ function prep() {
   // if this file execs... assume we're on deno.
   if (!Deno) throw new Error("failed loading deno-specific config");
 
-  const isProd = Deno.env.get("DENO_ENV") === "production";
+  const isProd = Deno.env.get("DENO_ENV_DOMAIN") === "production";
   const onDenoDeploy = Deno.env.get("CLOUD_PLATFORM") === "deno-deploy";
   const profiling = Deno.env.get("PROFILE_DNS_RESOLVES") === "true";
 
   globalThis.envManager = new EnvManager();
 
-  globalThis.log = new Log({
+  const logger = new Log({
     level: globalThis.envManager.get("LOG_LEVEL") as LogLevels,
     levelize: isProd || profiling, // levelize if prod or profiling
     withTimestamps: !onDenoDeploy, // do not log ts on deno-deploy
   });
+  setLogger(logger);
 
   // signal ready
   system.pub("ready");
